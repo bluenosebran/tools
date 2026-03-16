@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MS → Datto RMM Script Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #080a10;
+    --bg-main: #0c0f17;
+    --bg-surface: #111827;
+    --bg-raised: #1a2236;
+    --border-subtle: rgba(51,65,85,0.45);
+    --border-focus: rgba(59,130,246,0.45);
+    --border-success: rgba(74,222,128,0.25);
+    --text-primary: #e2e5eb;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-blue: #3b82f6;
+    --accent-indigo: #6366f1;
+    --accent-green: #4ade80;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --code-green: #a3e635;
+    --mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+    --sans: 'DM Sans', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--sans);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* ── Top Bar ── */
+  .topbar {
+    background: linear-gradient(135deg, var(--bg-surface) 0%, #0f172a 100%);
+    border-bottom: 1px solid rgba(59,130,246,0.12);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+
+  .logo {
+    width: 38px; height: 38px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-indigo));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px; font-weight: 800; color: #fff;
+    font-family: var(--mono);
+    letter-spacing: -0.05em;
+    box-shadow: 0 2px 12px rgba(99,102,241,0.3);
+  }
+
+  .topbar h1 {
+    font-size: 17px; font-weight: 700; color: #f1f5f9;
+    letter-spacing: -0.02em;
+  }
+
+  .topbar p {
+    font-size: 12px; color: var(--text-muted); margin-top: 1px;
+  }
+
+  .topbar-actions { display: flex; gap: 8px; }
+
+  /* ── Buttons ── */
+  .btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+    font-weight: 500;
+  }
+
+  .btn-ghost-blue {
+    background: rgba(59,130,246,0.08);
+    border-color: rgba(59,130,246,0.22);
+    color: #60a5fa;
+  }
+  .btn-ghost-blue:hover { background: rgba(59,130,246,0.18); }
+
+  .btn-ghost-red {
+    background: rgba(239,68,68,0.06);
+    border-color: rgba(239,68,68,0.18);
+    color: var(--accent-red);
+  }
+  .btn-ghost-red:hover { background: rgba(239,68,68,0.14); }
+
+  .btn-ghost-muted {
+    background: rgba(148,163,184,0.06);
+    border-color: rgba(148,163,184,0.18);
+    color: var(--text-secondary);
+  }
+  .btn-ghost-muted:hover { background: rgba(148,163,184,0.14); }
+
+  .btn-ghost-green {
+    background: rgba(74,222,128,0.08);
+    border-color: rgba(74,222,128,0.22);
+    color: var(--accent-green);
+  }
+  .btn-ghost-green:hover { background: rgba(74,222,128,0.18); }
+
+  .btn-ghost-amber {
+    background: rgba(251,191,36,0.08);
+    border-color: rgba(251,191,36,0.22);
+    color: var(--accent-amber);
+  }
+  .btn-ghost-amber:hover { background: rgba(251,191,36,0.18); }
+
+  .btn-convert {
+    width: 100%;
+    padding: 13px 0;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-indigo));
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 16px rgba(99,102,241,0.25);
+  }
+  .btn-convert:hover {
+    box-shadow: 0 4px 24px rgba(99,102,241,0.4);
+    transform: translateY(-1px);
+  }
+  .btn-convert:disabled {
+    background: var(--bg-raised);
+    color: #475569;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  /* ── Main Content ── */
+  .main { padding: 22px 28px; max-width: 1200px; margin: 0 auto; }
+
+  /* ── Transform Toggles ── */
+  .transforms { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+
+  .transform-btn {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 13px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .transform-btn.active {
+    border: 1px solid rgba(74,222,128,0.28);
+    background: rgba(74,222,128,0.07);
+    color: var(--accent-green);
+  }
+
+  .transform-btn.inactive {
+    border: 1px solid rgba(100,116,139,0.22);
+    background: rgba(30,41,59,0.45);
+    color: var(--text-muted);
+  }
+
+  .check-box {
+    width: 15px; height: 15px;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; line-height: 1; flex-shrink: 0;
+  }
+
+  .transform-btn.active .check-box { border: 2px solid var(--accent-green); }
+  .transform-btn.inactive .check-box { border: 2px solid #475569; }
+
+  /* ── Editor Panels ── */
+  .editor-label {
+    font-size: 11px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+
+  .editor-label-input { color: var(--text-muted); }
+  .editor-label-output { color: var(--accent-green); }
+
+  .editor-label .filename {
+    color: var(--text-secondary);
+    text-transform: none;
+    margin-left: 8px;
+  }
+
+  .editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  textarea.editor {
+    width: 100%;
+    height: 240px;
+    background: var(--bg-main);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 14px;
+    color: #c4cad4;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.65;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+    display: block;
+  }
+
+  textarea.editor:focus { border-color: var(--border-focus); }
+  textarea.editor.drag-over { border: 2px dashed rgba(59,130,246,0.5); background: rgba(59,130,246,0.04); }
+  textarea.editor.output-editor { color: var(--code-green); border-color: var(--border-success); background: #090c11; }
+  textarea.editor::placeholder { color: #28334a; }
+
+  textarea.editor::-webkit-scrollbar { width: 6px; }
+  textarea.editor::-webkit-scrollbar-track { background: transparent; }
+  textarea.editor::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+  .input-section { margin-bottom: 14px; }
+  .convert-section { margin-bottom: 18px; }
+
+  .output-section {
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Diff View ── */
+  .diff-container { margin-top: 22px; }
+
+  .diff-header {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 12px;
+  }
+
+  .diff-header h3 {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: #c4cad4;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .diff-badge {
+    font-size: 12px;
+    font-family: var(--mono);
+    padding: 2px 9px;
+    border-radius: 4px;
+  }
+
+  .diff-badge-removed { color: var(--accent-red); background: rgba(248,113,113,0.1); }
+  .diff-badge-added { color: var(--accent-green); background: rgba(74,222,128,0.1); }
+
+  .diff-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .diff-pane { padding: 12px 0; max-height: 280px; overflow-y: auto; }
+  .diff-pane-left { background: rgba(248,113,113,0.03); }
+  .diff-pane-right { background: rgba(74,222,128,0.03); }
+
+  .diff-pane-title {
+    padding: 0 12px 8px;
+    font-size: 11px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .diff-pane-left .diff-pane-title { color: var(--accent-red); }
+  .diff-pane-right .diff-pane-title { color: var(--accent-green); }
+
+  .diff-line {
+    padding: 1px 12px;
+    font-size: 11px;
+    font-family: var(--mono);
+    line-height: 1.7;
+    white-space: pre;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #5a6476;
+  }
+
+  .diff-line.removed {
+    background: rgba(248,113,113,0.1);
+    color: var(--accent-red);
+    text-decoration: line-through;
+  }
+
+  .diff-line.added {
+    background: rgba(74,222,128,0.1);
+    color: var(--accent-green);
+  }
+
+  .diff-line .marker { margin-right: 6px; }
+
+  /* ── Info Footer ── */
+  .info-footer {
+    margin-top: 26px;
+    padding: 15px 18px;
+    background: rgba(30,41,59,0.35);
+    border: 1px solid rgba(51,65,85,0.28);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.75;
+  }
+
+  .info-footer strong { color: var(--text-secondary); }
+
+  .info-footer code {
+    color: var(--accent-amber);
+    background: rgba(245,158,11,0.08);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  /* ── Hidden file input ── */
+  .hidden-input { display: none; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .topbar { padding: 14px 16px; flex-direction: column; gap: 10px; align-items: flex-start; }
+    .topbar-actions { width: 100%; }
+    .main { padding: 16px; }
+    .transforms { gap: 6px; }
+    .transform-btn { font-size: 11px; padding: 5px 10px; }
+    .diff-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Top Bar ── -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">D</div>
+    <div>
+      <h1>MS → Datto RMM Script Converter</h1>
+      <p>Strip interactive prompts from Microsoft scripts for silent RMM deployment</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost-blue" onclick="loadExample()">Load Example</button>
+    <button class="btn btn-ghost-red" onclick="clearAll()">Clear</button>
+  </div>
+</div>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- Transforms -->
+  <div class="transforms" id="transforms"></div>
+
+  <!-- Input -->
+  <div class="input-section">
+    <div class="editor-header">
+      <div class="editor-label editor-label-input">
+        Input — Microsoft Script
+        <span class="filename" id="fileNameDisplay"></span>
+      </div>
+      <button class="btn btn-ghost-muted" onclick="document.getElementById('fileInput').click()">Browse .cmd file</button>
+      <input type="file" id="fileInput" class="hidden-input" accept=".cmd,.bat,.ps1,.txt" onchange="handleFile(event)">
+    </div>
+    <textarea
+      class="editor"
+      id="inputEditor"
+      placeholder="Paste Microsoft onboarding/offboarding .cmd script here, or drag and drop the file..."
+      spellcheck="false"
+    ></textarea>
+  </div>
+
+  <!-- Convert Button -->
+  <div class="convert-section">
+    <button class="btn-convert" id="convertBtn" onclick="convert()" disabled>⚡ Convert for Datto RMM</button>
+  </div>
+
+  <!-- Output (hidden until converted) -->
+  <div class="output-section" id="outputSection" style="display:none;">
+    <div class="editor-header">
+      <div class="editor-label editor-label-output">✓ Output — Datto RMM Ready</div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-ghost-amber" id="diffBtn" onclick="toggleDiff()">Show Diff</button>
+        <button class="btn btn-ghost-muted" id="copyBtn" onclick="copyOutput()">Copy</button>
+        <button class="btn btn-ghost-blue" onclick="downloadOutput()">↓ Download .cmd</button>
+      </div>
+    </div>
+    <textarea class="editor output-editor" id="outputEditor" readonly></textarea>
+    <div class="diff-container" id="diffContainer" style="display:none;"></div>
+  </div>
+
+  <!-- Info Footer -->
+  <div class="info-footer">
+    <strong>What this does:</strong> Microsoft's Defender onboarding/offboarding scripts are designed for interactive use — they include
+    <code>set /p</code> prompts, <code>pause</code> commands, and <code>timeout.exe</code> calls that hang when run as a Datto RMM job.
+    This tool strips those interactive elements while leaving all the actual onboarding logic untouched. The converted script exits
+    with proper error codes so Datto can report job success/failure.
+  </div>
+</div>
+
+<script>
+// ── Transform Definitions ──
+const transforms = [
+  {
+    id: 'remove_prompt',
+    label: 'Remove Y/N interactive prompts',
+    description: 'Strips set /p user consent loops that hang RMM jobs',
+    enabled: true,
+    apply(script) {
+      let r = script;
+      r = r.replace(/:USER_CONSENT[\s\S]*?(?=:SCRIPT_START)/gi, '');
+      r = r.replace(/^:SCRIPT_START\s*\r?\n/gim, '');
+      r = r.replace(/^set\s+\/p\s+\w+\s*=.*(?:press|continue|cancel|confirm|yes|no).*$/gim, '');
+      r = r.replace(/^IF\s+\/I\s+"%shouldContinue%".*\r?\n(?:\s+GOTO\s+\w+\s*\r?\n\s*\)\s*\r?\n?)/gim, '');
+      r = r.replace(/^echo\.\s*\r?\necho Wrong input.*\r?\n.*GOTO USER_CONSENT.*$/gim, '');
+      return r;
+    }
+  },
+  {
+    id: 'remove_pause',
+    label: 'Remove "pause" commands',
+    description: 'Replaces pause with clean EXIT /B for non-interactive exit',
+    enabled: true,
+    apply(script) {
+      return script.replace(/^pause\s*$/gim, 'REM [Datto RMM] pause removed for non-interactive execution');
+    }
+  },
+  {
+    id: 'replace_timeout',
+    label: 'Replace timeout.exe with silent wait',
+    description: 'timeout.exe can prompt in non-interactive sessions; uses ping loopback instead',
+    enabled: true,
+    apply(script) {
+      return script.replace(
+        /%windir%\\System32\\timeout\.exe\s+(\d+)\s*>NUL\s*2>&1/gi,
+        (m, sec) => {
+          const pings = parseInt(sec) + 1;
+          return `REM [Datto RMM] Silent ${sec}s wait (replaces timeout.exe)\n\tping -n ${pings} 127.0.0.1 >NUL 2>&1`;
+        }
+      );
+    }
+  },
+  {
+    id: 'add_header',
+    label: 'Add Datto RMM header comment',
+    description: 'Adds a comment block identifying this as modified for RMM deployment',
+    enabled: true,
+    apply(script) {
+      const d = new Date().toISOString().split('T')[0];
+      const hdr = `REM ============================================================\nREM Modified for Datto RMM - Non-Interactive Execution\nREM Converted: ${d}\nREM Changes: Interactive prompts removed, pause removed,\nREM          timeout.exe replaced with silent waits\nREM ============================================================\n`;
+      const idx = script.search(/@echo\s+off/i);
+      if (idx !== -1) {
+        const match = script.match(/@echo\s+off/i);
+        const end = idx + match[0].length;
+        return script.slice(0, end) + '\n' + hdr + script.slice(end);
+      }
+      return hdr + script;
+    }
+  },
+  {
+    id: 'clean_blanks',
+    label: 'Clean up excessive blank lines',
+    description: 'Collapses 3+ consecutive blank lines left after removals',
+    enabled: true,
+    apply(script) {
+      return script.replace(/\n{4,}/g, '\n\n\n');
+    }
+  }
+];
+
+// ── State ──
+let fileName = '';
+let diffVisible = false;
+
+// ── Render Transform Toggles ──
+function renderTransforms() {
+  const container = document.getElementById('transforms');
+  container.innerHTML = transforms.map(t => `
+    <button
+      class="transform-btn ${t.enabled ? 'active' : 'inactive'}"
+      title="${t.description}"
+      onclick="toggleTransform('${t.id}')"
+    >
+      <span class="check-box">${t.enabled ? '✓' : ''}</span>
+      ${t.label}
+    </button>
+  `).join('');
+}
+
+function toggleTransform(id) {
+  const t = transforms.find(x => x.id === id);
+  if (t) t.enabled = !t.enabled;
+  renderTransforms();
+}
+
+// ── Input Handling ──
+const inputEl = document.getElementById('inputEditor');
+const convertBtn = document.getElementById('convertBtn');
+
+inputEl.addEventListener('input', () => {
+  convertBtn.disabled = !inputEl.value.trim();
+  document.getElementById('outputSection').style.display = 'none';
+  diffVisible = false;
+});
+
+// Drag and drop
+inputEl.addEventListener('dragover', e => { e.preventDefault(); inputEl.classList.add('drag-over'); });
+inputEl.addEventListener('dragleave', () => inputEl.classList.remove('drag-over'));
+inputEl.addEventListener('drop', e => {
+  e.preventDefault();
+  inputEl.classList.remove('drag-over');
+  const file = e.dataTransfer?.files?.[0];
+  if (file) readFile(file);
+});
+
+function handleFile(e) {
+  const file = e.target?.files?.[0];
+  if (file) readFile(file);
+}
+
+function readFile(file) {
+  fileName = file.name;
+  document.getElementById('fileNameDisplay').textContent = `(${fileName})`;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    inputEl.value = ev.target.result;
+    convertBtn.disabled = false;
+    document.getElementById('outputSection').style.display = 'none';
+    diffVisible = false;
+  };
+  reader.readAsText(file);
+}
+
+// ── Convert ──
+function convert() {
+  const input = inputEl.value;
+  if (!input.trim()) return;
+
+  let result = input;
+  transforms.forEach(t => {
+    if (t.enabled) result = t.apply(result);
+  });
+
+  document.getElementById('outputEditor').value = result;
+  document.getElementById('outputSection').style.display = 'block';
+  diffVisible = false;
+  document.getElementById('diffContainer').style.display = 'none';
+  document.getElementById('diffBtn').textContent = 'Show Diff';
+  document.getElementById('diffBtn').className = 'btn btn-ghost-amber';
+}
+
+// ── Copy ──
+function copyOutput() {
+  const text = document.getElementById('outputEditor').value;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied';
+    btn.className = 'btn btn-ghost-green';
+    setTimeout(() => { btn.textContent = 'Copy'; btn.className = 'btn btn-ghost-muted'; }, 2000);
+  });
+}
+
+// ── Download ──
+function downloadOutput() {
+  const text = document.getElementById('outputEditor').value;
+  if (!text) return;
+  const name = fileName ? fileName.replace(/\.cmd$/i, '') + '_DattoRMM.cmd' : 'Converted_DattoRMM.cmd';
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Diff View ──
+function toggleDiff() {
+  diffVisible = !diffVisible;
+  const container = document.getElementById('diffContainer');
+  const btn = document.getElementById('diffBtn');
+  if (diffVisible) {
+    btn.textContent = 'Hide Diff';
+    renderDiff();
+    container.style.display = 'block';
+  } else {
+    btn.textContent = 'Show Diff';
+    container.style.display = 'none';
+  }
+}
+
+function renderDiff() {
+  const origLines = inputEl.value.split('\n');
+  const convLines = document.getElementById('outputEditor').value.split('\n');
+
+  const origSet = new Set(origLines.filter(l => l.trim()));
+  const convSet = new Set(convLines.filter(l => l.trim()));
+
+  let removedCount = 0, addedCount = 0;
+
+  const leftHtml = origLines.map(line => {
+    const isRemoved = line.trim() && !convSet.has(line);
+    if (isRemoved) removedCount++;
+    return `<div class="diff-line ${isRemoved ? 'removed' : ''}">${isRemoved ? '<span class="marker">−</span>' : ''}${escHtml(line) || ' '}</div>`;
+  }).join('');
+
+  const rightHtml = convLines.map(line => {
+    const isAdded = line.trim() && !origSet.has(line);
+    if (isAdded) addedCount++;
+    return `<div class="diff-line ${isAdded ? 'added' : ''}">${isAdded ? '<span class="marker">+</span>' : ''}${escHtml(line) || ' '}</div>`;
+  }).join('');
+
+  document.getElementById('diffContainer').innerHTML = `
+    <div class="diff-header">
+      <h3>Change Summary</h3>
+      <span class="diff-badge diff-badge-removed">−${removedCount} removed</span>
+      <span class="diff-badge diff-badge-added">+${addedCount} added</span>
+    </div>
+    <div class="diff-grid">
+      <div class="diff-pane diff-pane-left">
+        <div class="diff-pane-title">Original</div>
+        ${leftHtml}
+      </div>
+      <div class="diff-pane diff-pane-right">
+        <div class="diff-pane-title">Converted</div>
+        ${rightHtml}
+      </div>
+    </div>
+  `;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Example ──
+function loadExample() {
+  inputEl.value = '@echo off\n\necho This script is for onboarding machines to the Microsoft Defender for Endpoint services.\necho Once completed, the machine should light up in the portal within 5-30 minutes.\necho.\n:USER_CONSENT\nset /p shouldContinue= "Press (Y) to confirm and continue or (N) to cancel and exit: "\nIF /I "%shouldContinue%"=="N" (\n\tGOTO CLEANUP\n)\nIF /I "%shouldContinue%"=="Y" (\n\tGOTO SCRIPT_START\n)\necho.\necho Wrong input. Please try again.\nGOTO USER_CONSENT\necho.\n:SCRIPT_START\n\necho Starting onboarding process...\n\n%windir%\\System32\\timeout.exe 5 >NUL 2>&1\n\necho Done.\npause\nEXIT /B 0';
+  fileName = 'example_onboarding.cmd';
+  document.getElementById('fileNameDisplay').textContent = '(example_onboarding.cmd)';
+  convertBtn.disabled = false;
+  document.getElementById('outputSection').style.display = 'none';
+  diffVisible = false;
+}
+
+// ── Clear ──
+function clearAll() {
+  inputEl.value = '';
+  document.getElementById('outputEditor').value = '';
+  document.getElementById('outputSection').style.display = 'none';
+  document.getElementById('fileNameDisplay').textContent = '';
+  document.getElementById('diffContainer').style.display = 'none';
+  fileName = '';
+  diffVisible = false;
+  convertBtn.disabled = true;
+}
+
+// ── Init ──
+renderTransforms();
+</script>
+</body>
+</html>
